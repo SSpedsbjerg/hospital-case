@@ -22,8 +22,13 @@ public class AppointmentService
     private bool EvaluateAppointmentRules(Appointment appointment) {
         Department departmentRules = departmentRepository.Get(appointment.Department);
         foreach(Delegate departmentRule in departmentRules.method) {
-            Dictionary<string, object> methodParameterValues = appointment.GetType().GetProperties().ToDictionary(parameter => parameter.Name.ToLower(), parameter => parameter.GetValue(appointment));
-            object[] arguments = departmentRule.Method.GetParameters().Select(parameter => methodParameterValues.TryGetValue(parameter.Name.ToLower(), out var value) ? value : null).ToArray();
+            Dictionary<string, object> methodParameterValues = appointment.GetType()
+                .GetProperties()
+                .ToDictionary(parameter => parameter.Name.ToLower(), parameter => parameter.GetValue(appointment));
+            object[] arguments = departmentRule.Method.GetParameters()
+                .Select(parameter => methodParameterValues
+                .TryGetValue(parameter.Name.ToLower(), out var value) ? value : null)
+                .ToArray();
             bool success = (bool)departmentRule.DynamicInvoke(arguments);
             if(!success) {
                 Console.WriteLine(departmentRules.onFailureMessage);
