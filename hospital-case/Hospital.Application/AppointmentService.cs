@@ -13,30 +13,54 @@ public class AppointmentService
     public AppointmentService(AppointmentRepository appointmentRepository) {
         this.appointmentRepository = appointmentRepository;
         this.departmentRepository = new();
-        departmentRepository.Add("General Practice", [IsAssignedToGP], "[ERROR] Patients can only book appointments with their assigned GP.");
-        departmentRepository.Add("Physiotherapy", [HasValidReferral, HasValidFinancialApproval], "[ERROR] Physiotherapy requires a doctor's referral." ); //ToDo: add support for multiple error messages based on functions
-        departmentRepository.Add("Surgery", [HasValidReferral], "[ERROR] Surgery requires a specialist referral." ); //ToDo: add support for multiple error messages based on functions
-        departmentRepository.Add("Radiology", [HasValidReferral, HasValidFinancialApproval], "[ERROR] Radiology requires a doctor's referral." ); //ToDo: add support for multiple error messages based on functions
+
+        //Department name, array of all method calls, array of all error messages.
+        //If error messages is fewer than method calls default to first value.
+        departmentRepository.Add("General Practice",
+            [IsAssignedToGP],
+            ["[ERROR] Patients can only book appointments with their assigned GP."]);
+
+        departmentRepository.Add("Physiotherapy",
+            [HasValidReferral, HasValidFinancialApproval],
+            ["[ERROR] Physiotherapy requires a doctor's referral.", "[ERROR] Physiotherapy requires valid insurance approval."]);
+
+        departmentRepository.Add("Surgery",
+            [HasValidReferral],
+            ["[ERROR] Surgery requires a specialist referral."]);
+
+        departmentRepository.Add("Radiology",
+            [HasValidReferral, HasValidFinancialApproval],
+            ["[ERROR] Radiology requires a doctor's referral.", "[ERROR] Radiology procedures may require financial approval."]);
     }
 
     private bool EvaluateAppointmentRules(Appointment appointment) {
         Department departmentRules = departmentRepository.Get(appointment.Department);
-        foreach(Delegate departmentRule in departmentRules.method) {
-            Dictionary<string, object> methodParameterValues = appointment.GetType()
+        int errorMessageIndex = 0;
+        foreach (Delegate departmentRule in departmentRules.method) {
+            Dictionary<string, object?> methodParameterValues = appointment.GetType()
                 .GetProperties()
                 .ToDictionary(parameter => parameter.Name.ToLower(), parameter => parameter.GetValue(appointment));
-            object[] arguments = departmentRule.Method.GetParameters()
+
+            object?[] arguments = departmentRule.Method.GetParameters()
                 .Select(parameter => methodParameterValues
                 .TryGetValue(parameter.Name.ToLower(), out var value) ? value : null)
                 .ToArray();
+
             bool success = (bool)departmentRule.DynamicInvoke(arguments);
             if(!success) {
-                Console.WriteLine(departmentRules.onFailureMessage);
+                if(errorMessageIndex < departmentRules.onFailureMessages.Count) {
+                    Console.WriteLine(departmentRules.onFailureMessages[errorMessageIndex]);
+                }
+                else {
+                    Console.WriteLine(departmentRules.onFailureMessages.FirstOrDefault());
+                }
                 return false;
             }
+            errorMessageIndex++;
         }
         return true;
-    }   
+    }
+
     public async Task<bool> ScheduleAppointment(
         string cpr, string patientName, DateTime appointmentDate,
         string department, string doctorName)
@@ -68,8 +92,9 @@ public class AppointmentService
         bool success = EvaluateAppointmentRules(appointment);
         if(success) {
             await appointmentRepository.AddAsync(appointment);
+            return true;
         }
-        return true;
+        return false;
     }
 
     private bool IsAssignedToGP(string cpr, string doctorName)

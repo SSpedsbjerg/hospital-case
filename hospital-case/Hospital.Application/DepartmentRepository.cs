@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace Hospital.Application {
     public class DepartmentRepository {
-        public void Add(string departmentName, ICollection<Delegate> methods, string errorMessage) {
+        public void Add(string departmentName, IList<Delegate> methods, IList<string> errorMessages) {
             if(!departments.ContainsKey(departmentName)) {
-                departments.Add(departmentName, new Department(methods, errorMessage));
+                departments.Add(departmentName, new Department(methods, errorMessages));
             }
         }
 
@@ -17,6 +17,6 @@ namespace Hospital.Application {
         }
 
         private Dictionary<string, Department> departments = new();
-        public record Department(ICollection<Delegate> method, string onFailureMessage);
+        public record Department(IList<Delegate> method, IList<string> onFailureMessages);
     }
 }
